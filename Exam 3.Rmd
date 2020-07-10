@@ -1,0 +1,177 @@
+---
+title: "Exam 3"
+author: "Daniel Mahoney"
+date: "7/9/2020"
+output: word_document
+---
+
+
+
+```{r}
+#clear the environment
+rm(list=ls(all=TRUE))
+#load tidycensus package
+library(tidycensus)
+library(rio)
+#load API key
+census_api_key("9da890b3bdb2c7b594644e9bed81bd05fef3a377",
+               install = TRUE, 
+               overwrite =TRUE)
+#load inequality Gini index variable
+v15 <- load_variables(year= 2015, dataset = "acs5")
+v10 <- load_variables(year = 2010, dataset = "acs5")
+#subset data for Gini
+inequality_panel1<-subset(v15, name =="B19083_001")
+inequality_panel2<- subset(v10, name =="B19083_001")
+inequality_panel <- merge(inequality_panel1, inequality_panel2, by.x=intersect(names(inequality_panel1), names(inequality_panel2)))
+#rename variables
+library(data.table)
+names(inequality_panel)
+setnames(inequality_panel, "estimate", "gini")
+setnames(inequality_panel, "name", "state")
+head(inequality_panel)
+```
+
+```{r}
+#make data wide
+library(tidyverse)
+inequality_wide <- 
+  inequality_panel %>%
+  pivot_wider(id_cols = c("gini 2010", "gini 2105"),
+              names_from = "gini",
+              values_from = "state",
+              names_prefix = "year_")
+head(inequality_wide)
+```
+
+```{r}
+#reshape wide to long
+library(tidyr)
+inequality_long<-
+  inequality_wide %>%
+  pivot_longer(cols = starts_with("year"),
+               names_to = "year",
+               names_prefix = "year_",
+               values_to = "state", 
+               values_drop_na = FALSE) %>%
+```
+```{r}
+library(arsenal)
+#compare character count
+summary(comparedf(inequality_long, inequality_panel))
+```
+
+```{r}
+#collapse inequality_long
+inequality_collapsed <-
+  inequality_long %>%
+  group_by(GEOID, state, year) %>%
+  summarize(across(where(is.numeric), sum)) %>%
+  select(-c("year"))
+```
+
+```{r}
+#7
+```
+
+```{r}
+#WDI package to import GDP in current US dollars
+library(WDI)
+WDI(
+  country= "all",
+  indicator = " NY.GDP.MKTP.CD",
+  start = 2006, 
+  end = 2007,
+  extra = FALSE
+  
+)
+  
+
+```
+
+```{r}
+#deflate data
+gdp_deflated = WDI(country = "all",
+                   indicator = "NY.GOP.DEFL.ZS",
+                   start = 2010, end =2020,
+                   extra = FALSE, cache = NULL)
+library(data.table)
+setnames(gdp_deflated, "NY.GOP.DEFL.ZS", "deflator")
+
+gdp_current = subset(gdp_deflated, country == "United States")
+```
+
+10. In the Shiny app, the three main components the user interface with fluidPage(title, response, theme), server function with function(input,output), and excuting shiny app with shinyApp(ui, server)
+
+```{r}
+#pull pdf from online
+#check libraries
+library(pdftools)
+library(tidyr)
+library(tidytext)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+#readin pdf file
+mytext <- pdf_text(pdf ="https://pdf.usaid.gov/pdf_docs/PA00TNMG.pdf")
+#turn text into dataframe
+armeniatext= as.data.frame(mytext, stringsAsFactors = FALSE)
+#tokenize it
+armeniatext <- armeniatext %>%
+  unnest_tokens(word, text, token = "words")
+data(stop_words)
+armeniatext <- armeniatext %>%
+  anti_join(stop_words)
+```
+
+```{r}
+#check word frequencies
+hpfreq <- armeniatext %>%
+  count(word, sort = TRUE)
+head(hpfreq)
+```
+
+```{r}
+#load top 100 page
+library(rvest)
+library(dplyr)
+library(ggplot2)
+
+hot100page <- "https://www.billboard.com/charts/hot-100"
+hot100exam <- read_html(hot100page)
+hot100exam
+str(hot100exam)
+
+body_nodes <- hot100exam %>%
+  html_nodes("body") %>%
+  html_children()
+body_nodes
+
+body_nodes %>%
+   html_children()
+
+#pull out rank artist, title, and Last Week
+rank <- hot100exam %>%
+  rvest:: html_nodes('body') %>%
+  xml2::xml_find_all("//span[contains(@class, 
+                     'chart-element__rank__number')") %>%
+  rvest::html_text()
+
+artist <- hot100exam %>%
+  rvest:: html_nodes('body') %>%
+  xml2::xml_find_all("//span[contains(@class, 
+                     'chart-element__information__artist')") %>%
+  rvest::html_text()
+
+title <- hot100exam %>%
+  rvest:: html_nodes('body') %>%
+  xml2::xml_find_all("//span[contains(@class, 
+                     'chart-element__information__song')") %>%
+  rvest::html_text()
+
+last_week <- hot100exam %>%
+  rvest:: html_nodes('body') %>%
+  xml2::xml_find_all("//span[contains(@class, 
+                     'chart-element__information__delta__text')") %>%
+  rvest::html_text()
+```
